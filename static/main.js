@@ -9,7 +9,7 @@ let buf = new BigUint64Array(1);
 let room = "room" + crypto.getRandomValues(buf)
 let pc;
 let chunks = [];
-let mediaRecorderLocal;
+let mediaRecorder;
 
 const webcamButton = document.getElementById('webcamButton');
 const callButton = document.getElementById('callButton');
@@ -32,8 +32,6 @@ const servers = {
 // Used so I don't get anymore errors with addTrack
 function createPeerConnection() {
   pc = new RTCPeerConnection(servers);
-
-  //Handling Remote Media Stream
   remoteStream = new MediaStream();
   pc.ontrack = event => {
     remoteStream.addTrack(event.track);
@@ -54,9 +52,43 @@ function createPeerConnection() {
 
 // Start webcam
 webcamButton.onclick = async () => {
-  localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false});
-  mediaRecorderLocal = new MediaRecorder(localStream);
-  webcamVideo.srcObject = localStream;
+    localStream = await navigator.mediaDevices.getUserMedia({video: true, audio: false});
+    mediaRecorder = new MediaRecorder(localStream);
+    webcamVideo.srcObject = localStream;
+
+    mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+            chunks.push(event.data);
+        }
+
+        mediaRecorder.onstop = () => {
+            const blob = new Blob(chunks, {type: "video/webm"});
+            const url = URL.createObjectURL(blob);
+
+            // Auto-download the recording
+            const a = document.createElement("a");
+            a.style.display = "none";
+            a.href = url;
+            a.download = "test.webm";
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            chunks = [];
+        };
+        recordButton.disabled = false;
+    };
+    let recording = false;
+    recordButton.onclick = () => {
+        if (!recording) {
+            mediaRecorder.start();
+            recordButton.textContent = "Stop Recording";
+            recording = true;
+        } else {
+            mediaRecorder.stop();
+            recordButton.textContent = "Start Recording";
+            recording = false;
+        }
+    }
 };
 
 // Handling Call Button (For the Caller)

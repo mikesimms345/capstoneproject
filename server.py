@@ -133,7 +133,7 @@ def logout():
         db.session.commit()
         print("jti ", jti, " added to blocklist")
     except Exception as e:
-        print("Blocklist was not updated")
+        print("Blocklist was not updated: ", e)
     response = jsonify({"message": "Logout Successful"})
     unset_jwt_cookies(response)
     print(f"Logout Successful")
