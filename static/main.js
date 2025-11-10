@@ -10,6 +10,7 @@ let room = "room" + crypto.getRandomValues(buf)
 let pc;
 let chunks = [];
 let mediaRecorder;
+let filename = crypto.getRandomValues(buf);
 
 const webcamButton = document.getElementById('webcamButton');
 const callButton = document.getElementById('callButton');
@@ -29,7 +30,7 @@ const servers = {
   ]
 }
 
-// Used so I don't get anymore errors with addTrack
+// Helper Functions
 function createPeerConnection() {
   pc = new RTCPeerConnection(servers);
   remoteStream = new MediaStream();
@@ -38,6 +39,7 @@ function createPeerConnection() {
     console.log("stream received");
   };
   remoteVideo.srcObject = remoteStream;
+
 
   // Ice Candidates
   pc.onicecandidate = event => {
@@ -50,45 +52,36 @@ function createPeerConnection() {
   }
 }
 
-// Start webcam
-webcamButton.onclick = async () => {
-    localStream = await navigator.mediaDevices.getUserMedia({video: true, audio: false});
-    mediaRecorder = new MediaRecorder(localStream);
-    webcamVideo.srcObject = localStream;
-
-    mediaRecorder.ondataavailable = (event) => {
+function startBackgroundRecorder(stream) {
+    mediaRecorder = new MediaRecorder(stream);
+    mediaRecorder.ondataavailable = async (event) => {
         if (event.data.size > 0) {
             chunks.push(event.data);
         }
-
-        mediaRecorder.onstop = () => {
-            const blob = new Blob(chunks, {type: "video/webm"});
-            const url = URL.createObjectURL(blob);
-
-            // Auto-download the recording
-            const a = document.createElement("a");
-            a.style.display = "none";
-            a.href = url;
-            a.download = "test.webm";
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            chunks = [];
-        };
-        recordButton.disabled = false;
-    };
-    let recording = false;
-    recordButton.onclick = () => {
-        if (!recording) {
-            mediaRecorder.start();
-            recordButton.textContent = "Stop Recording";
-            recording = true;
-        } else {
-            mediaRecorder.stop();
-            recordButton.textContent = "Start Recording";
-            recording = false;
+        const blob = new Blob(chunks, {type: "video/webm"});
+        let formData = new FormData();
+        formData.append("file", blob);
+        try {
+            const response = await fetch('/pipeline', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+            console.log(data);
+        } catch (error) {
+            console.error('An error occurred during the sending process:', error);
         }
-    }
+        chunks = [];
+    };
+    mediaRecorder.start(10000)
+    console.log("recorder started");
+}
+
+// Start webcam
+webcamButton.onclick = async () => {
+    localStream = await navigator.mediaDevices.getUserMedia({video: true, audio: false});
+    webcamVideo.srcObject = localStream;
+    startBackgroundRecorder(localStream);
 };
 
 // Handling Call Button (For the Caller)
@@ -138,17 +131,12 @@ answerButton.onclick = async () => {
   if (element) {
     element.textContent = '';
   }
-
+  //mediaRecorder.start()
   localStream.getTracks().forEach(track => {
     pc.addTrack(track, localStream);
   });
   console.log("made it here");
   socket.emit ('ans_join', {room});
-
-    //Media Recorder code
-    mediaRecorderLocal.start();
-    console.log(mediaRecorderLocal.state)
-    console.log('recorder started');
 }
 
 hangupButton.onclick = async () => {
@@ -160,15 +148,7 @@ hangupButton.onclick = async () => {
         pc = null;
     }
     remoteVideo.srcObject = null;
-
-    // mediaRecorder.stop();
-    // console.log(mediaRecorder.state)
-    // console.log('recorder stopped');
 };
-
-//mediaRecorder.onstop = async () => {
-//     console.log('data available after stop');
-// }
 
 logoutButton.onclick = async () => {
     try {

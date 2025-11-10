@@ -6,6 +6,7 @@ from flask_jwt_extended import create_access_token, jwt_required, JWTManager, \
     set_access_cookies, get_jwt, unset_jwt_cookies, get_jwt_identity
 from flask_bcrypt import Bcrypt
 from datetime import timedelta, datetime, timezone
+import tempfile
 
 app = Flask(__name__, static_folder='static')
 socketio = SocketIO(app, cors_allowed_origins="*")
@@ -138,6 +139,18 @@ def logout():
     unset_jwt_cookies(response)
     print(f"Logout Successful")
     return response
+
+@app.route('/pipeline', methods=['POST'])
+@jwt_required()
+def pipeline():
+    video = request.files['file']
+    # INSERT INPUT VALIDATION CHECK HERE, IN CASE ATTACKER IS ABLE TO UPLOAD
+    if not video:
+        return jsonify("error with video file"), 400
+    file = tempfile.mkstemp(suffix=".webm")
+    video.save(file[1])
+    #CAN PROCESS IT HERE
+    return jsonify({"file successfully saved": file[1]})
 
 
 @socketio.on('join')
