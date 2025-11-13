@@ -20,7 +20,6 @@ const hangupButton = document.getElementById('hangupButton');
 const webcamVideo = document.getElementById('webcamVideo');
 const remoteVideo = document.getElementById('remoteVideo');
 const logoutButton = document.getElementById('logoutButton');
-const recordButton = document.getElementById('recordButton');
 
 const servers = {
   iceServers: [
@@ -40,8 +39,6 @@ function createPeerConnection() {
   };
   remoteVideo.srcObject = remoteStream;
 
-
-  // Ice Candidates
   pc.onicecandidate = event => {
     if (event.candidate) {
       console.log("Sent ICE Candidates");
@@ -84,7 +81,6 @@ webcamButton.onclick = async () => {
     startBackgroundRecorder(localStream);
 };
 
-// Handling Call Button (For the Caller)
 callButton.onclick = async () => {
   if (!localStream) {
     alert("Webcam isn't working, refresh and try again!");
@@ -104,16 +100,6 @@ callButton.onclick = async () => {
   element.appendChild(para);
 }
 
-copyButton.onclick = async () => {
-  try {
-    await navigator.clipboard.writeText(room);
-  } catch (err) {
-    console.log("Error: ", err);
-  }
-  alert("Copied to clipboard");
-}
-
-// Handling the answer button (For the Callee)
 answerButton.onclick = async () => {
   if (!localStream) {
     alert("Webcam is not on, please refresh the page and try again!");
@@ -131,12 +117,21 @@ answerButton.onclick = async () => {
   if (element) {
     element.textContent = '';
   }
-  //mediaRecorder.start()
+
   localStream.getTracks().forEach(track => {
     pc.addTrack(track, localStream);
   });
   console.log("made it here");
   socket.emit ('ans_join', {room});
+}
+
+copyButton.onclick = async () => {
+  try {
+    await navigator.clipboard.writeText(room);
+  } catch (err) {
+    console.log("Error: ", err);
+  }
+  alert("Copied to clipboard");
 }
 
 hangupButton.onclick = async () => {

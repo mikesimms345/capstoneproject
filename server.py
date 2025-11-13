@@ -1,4 +1,6 @@
 import os
+import time
+
 from flask import Flask, request,  render_template, session, jsonify
 from flask_socketio import SocketIO, emit, join_room
 from flask_sqlalchemy import SQLAlchemy
@@ -147,10 +149,21 @@ def pipeline():
     # INSERT INPUT VALIDATION CHECK HERE, IN CASE ATTACKER IS ABLE TO UPLOAD
     if not video:
         return jsonify("error with video file"), 400
-    file = tempfile.mkstemp(suffix=".webm")
-    video.save(file[1])
-    #CAN PROCESS IT HERE
-    return jsonify({"file successfully saved": file[1]})
+    file, path = tempfile.mkstemp(suffix=".webm")
+    video.save(path)
+    print(f"Video saved to {path}")
+    try:
+        # CAN PROCESS IT HERE
+        # OpenCV split it into frames using VideoCapture
+        # Take all the frames, draw a bounding box around the face, and then crop it
+        # Put it into the binary classification model
+        pass
+    #Still need to double check if the file is actually getting deleted or na
+    except Exception as e:
+        return jsonify({"message": f"Error processing video file: {e}"}), 400
+    finally:
+        os.remove(path)
+        return jsonify({"file successfully deleted": path})
 
 
 @socketio.on('join')
