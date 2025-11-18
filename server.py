@@ -1,4 +1,6 @@
 import os
+import time
+
 from flask import Flask, request,  render_template, session, jsonify
 from flask_socketio import SocketIO, emit, join_room
 from flask_sqlalchemy import SQLAlchemy
@@ -6,6 +8,7 @@ from flask_jwt_extended import create_access_token, jwt_required, JWTManager, \
     set_access_cookies, get_jwt, unset_jwt_cookies, get_jwt_identity
 from flask_bcrypt import Bcrypt
 from datetime import timedelta, datetime, timezone
+import tempfile
 
 app = Flask(__name__, static_folder='static')
 socketio = SocketIO(app, cors_allowed_origins="*")
@@ -133,11 +136,34 @@ def logout():
         db.session.commit()
         print("jti ", jti, " added to blocklist")
     except Exception as e:
-        print("Blocklist was not updated")
+        print("Blocklist was not updated: ", e)
     response = jsonify({"message": "Logout Successful"})
     unset_jwt_cookies(response)
     print(f"Logout Successful")
     return response
+
+@app.route('/pipeline', methods=['POST'])
+@jwt_required()
+def pipeline():
+    video = request.files['file']
+    # INSERT INPUT VALIDATION CHECK HERE, IN CASE ATTACKER IS ABLE TO UPLOAD
+    if not video:
+        return jsonify("error with video file"), 400
+    file, path = tempfile.mkstemp(suffix=".webm")
+    video.save(path)
+    print(f"Video saved to {path}")
+    try:
+        # CAN PROCESS IT HERE
+        # OpenCV split it into frames using VideoCapture
+        # Take all the frames, draw a bounding box around the face, and then crop it
+        # Put it into the binary classification model
+        pass
+    #Still need to double check if the file is actually getting deleted or na
+    except Exception as e:
+        return jsonify({"message": f"Error processing video file: {e}"}), 400
+    finally:
+        os.remove(path)
+        return jsonify({"file successfully deleted": path})
 
 
 @socketio.on('join')

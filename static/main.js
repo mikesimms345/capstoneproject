@@ -9,7 +9,8 @@ let buf = new BigUint64Array(1);
 let room = "room" + crypto.getRandomValues(buf)
 let pc;
 let chunks = [];
-let mediaRecorderLocal;
+let mediaRecorder;
+let filename = crypto.getRandomValues(buf);
 
 const webcamButton = document.getElementById('webcamButton');
 const callButton = document.getElementById('callButton');
@@ -19,7 +20,6 @@ const hangupButton = document.getElementById('hangupButton');
 const webcamVideo = document.getElementById('webcamVideo');
 const remoteVideo = document.getElementById('remoteVideo');
 const logoutButton = document.getElementById('logoutButton');
-const recordButton = document.getElementById('recordButton');
 
 const servers = {
   iceServers: [
@@ -29,11 +29,9 @@ const servers = {
   ]
 }
 
-// Used so I don't get anymore errors with addTrack
+// Helper Functions
 function createPeerConnection() {
   pc = new RTCPeerConnection(servers);
-
-  //Handling Remote Media Stream
   remoteStream = new MediaStream();
   pc.ontrack = event => {
     remoteStream.addTrack(event.track);
@@ -41,7 +39,6 @@ function createPeerConnection() {
   };
   remoteVideo.srcObject = remoteStream;
 
-  // Ice Candidates
   pc.onicecandidate = event => {
     if (event.candidate) {
       console.log("Sent ICE Candidates");
@@ -52,14 +49,38 @@ function createPeerConnection() {
   }
 }
 
+function startBackgroundRecorder(stream) {
+    mediaRecorder = new MediaRecorder(stream);
+    mediaRecorder.ondataavailable = async (event) => {
+        if (event.data.size > 0) {
+            chunks.push(event.data);
+        }
+        const blob = new Blob(chunks, {type: "video/webm"});
+        let formData = new FormData();
+        formData.append("file", blob);
+        try {
+            const response = await fetch('/pipeline', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+            console.log(data);
+        } catch (error) {
+            console.error('An error occurred during the sending process:', error);
+        }
+        chunks = [];
+    };
+    mediaRecorder.start(10000)
+    console.log("recorder started");
+}
+
 // Start webcam
 webcamButton.onclick = async () => {
-  localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false});
-  mediaRecorderLocal = new MediaRecorder(localStream);
-  webcamVideo.srcObject = localStream;
+    localStream = await navigator.mediaDevices.getUserMedia({video: true, audio: false});
+    webcamVideo.srcObject = localStream;
+    startBackgroundRecorder(localStream);
 };
 
-// Handling Call Button (For the Caller)
 callButton.onclick = async () => {
   if (!localStream) {
     alert("Webcam isn't working, refresh and try again!");
@@ -79,16 +100,6 @@ callButton.onclick = async () => {
   element.appendChild(para);
 }
 
-copyButton.onclick = async () => {
-  try {
-    await navigator.clipboard.writeText(room);
-  } catch (err) {
-    console.log("Error: ", err);
-  }
-  alert("Copied to clipboard");
-}
-
-// Handling the answer button (For the Callee)
 answerButton.onclick = async () => {
   if (!localStream) {
     alert("Webcam is not on, please refresh the page and try again!");
@@ -112,11 +123,15 @@ answerButton.onclick = async () => {
   });
   console.log("made it here");
   socket.emit ('ans_join', {room});
+}
 
-    //Media Recorder code
-    mediaRecorderLocal.start();
-    console.log(mediaRecorderLocal.state)
-    console.log('recorder started');
+copyButton.onclick = async () => {
+  try {
+    await navigator.clipboard.writeText(room);
+  } catch (err) {
+    console.log("Error: ", err);
+  }
+  alert("Copied to clipboard");
 }
 
 hangupButton.onclick = async () => {
@@ -128,15 +143,7 @@ hangupButton.onclick = async () => {
         pc = null;
     }
     remoteVideo.srcObject = null;
-
-    // mediaRecorder.stop();
-    // console.log(mediaRecorder.state)
-    // console.log('recorder stopped');
 };
-
-//mediaRecorder.onstop = async () => {
-//     console.log('data available after stop');
-// }
 
 logoutButton.onclick = async () => {
     try {
